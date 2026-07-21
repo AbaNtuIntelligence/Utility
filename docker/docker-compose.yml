@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: municipalflow
+      POSTGRES_USER: municipal_user
+      POSTGRES_PASSWORD: municipal_pass
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  # Redis Cache & Message Broker
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  # Django Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/Dockerfile.backend
+    volumes:
+      - ./backend:/app
+      - media_volume:/app/media
+      - static_volume:/app/staticfiles
+    environment:
+      - DEBUG=1
+      - DATABASE_URL=postgresql://municipal_user:municipal_pass@db:5432/municipalflow
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+
+  # Celery Worker (Background PDF Processing)
+  celery:
+    build:
+      context: ./backend
+      dockerfile: ../docker/Dockerfile.backend
+    volumes:
+      - ./backend:/app
+      - media_volume:/app/media
+    environment:
+      - DEBUG=1
+      - DATABASE_URL=postgresql://municipal_user:municipal_pass@db:5432/municipalflow
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - db
+      - redis
+    command: celery -A backend worker -l info -Q pdf_processing,audit,notifications
+
+  # Celery Beat (Scheduled Tasks)
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: ../docker/Dockerfile.backend
+    volumes:
+      - ./backend:/app
+    environment:
+      - DATABASE_URL=postgresql://municipal_user:municipal_pass@db:5432/municipalflow
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - db
+      - redis
+    command: celery -A backend beat -l info
+
+  # React Frontend (Development)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/Dockerfile.frontend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000/api
+    command: npm run dev -- --host 0.0.0.0
+
+  # Nginx (Production - uncomment when deploying)
+  # nginx:
+  #   image: nginx:alpine
+  #   volumes:
+  #     - ./docker/nginx.conf:/etc/nginx/nginx.conf
+  #     - static_volume:/static
+  #     - media_volume:/media
+  #   ports:
+  #     - "80:80"
+  #   depends_on:
+  #     - backend
+  #     - frontend
+
+volumes:
+  postgres_data:
+  media_volume:
+  static_volume:

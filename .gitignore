@@ -1,0 +1,50 @@
+# Backend
+backend/.env
+backend/media/
+backend/logs/
+backend/__pycache__/
+backend/*/__pycache__/
+*.pyc
+*.sqlite3
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+db.sqlite3
+
+# Django uploads and secrets
+media/
+.env
+*.env
+
+# Node/Vite
+node_modules/
+dist/
+.vite/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
